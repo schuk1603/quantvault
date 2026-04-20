@@ -9,20 +9,18 @@ const httpServer = createServer(app);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  next();
-});
-
-(async () => {
+let initialized = false;
+const init = (async () => {
   await registerRoutes(httpServer, app);
-
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    console.error("Error:", err);
-    if (res.headersSent) return;
-    res.status(status).json({ message });
+    if (!res.headersSent) res.status(status).json({ message });
   });
+  initialized = true;
 })();
 
-export default app;
+export default async function handler(req: Request, res: Response) {
+  if (!initialized) await init;
+  return app(req, res);
+}

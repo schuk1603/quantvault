@@ -3,3 +3,4 @@ dist/
 quantvault.db
 *.db
 .env
+api/index.js
