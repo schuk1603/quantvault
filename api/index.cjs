@@ -28,6 +28,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/ms/index.js
 var require_ms = __commonJS({
@@ -23597,6 +23598,11 @@ var require_express2 = __commonJS({
 });
 
 // api-src/handler.ts
+var handler_exports = {};
+__export(handler_exports, {
+  default: () => handler
+});
+module.exports = __toCommonJS(handler_exports);
 var import_express = __toESM(require_express2(), 1);
 
 // server/storage.ts
@@ -30319,10 +30325,10 @@ var ready = (async () => {
     if (!res.headersSent) res.status(status).json({ message });
   });
 })();
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   await ready;
   return app(req, res);
-};
+}
 /*! Bundled license information:
 
 depd/index.js:

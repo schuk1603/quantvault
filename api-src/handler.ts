@@ -8,7 +8,7 @@ const httpServer = createServer(app);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Initialize routes once
+// Initialize routes once at cold start
 const ready = (async () => {
   await registerRoutes(httpServer, app);
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -19,8 +19,8 @@ const ready = (async () => {
   });
 })();
 
-// Vercel serverless handler
+// Vercel serverless handler — CJS module.exports
 export default async function handler(req: Request, res: Response) {
   await ready;
   return app(req, res);
-}
+};

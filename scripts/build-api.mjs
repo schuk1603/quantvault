@@ -7,8 +7,8 @@ await build({
   entryPoints: ["api-src/handler.ts"],
   bundle: true,
   platform: "node",
-  format: "esm",
-  outfile: "api/index.js",
+  format: "cjs",
+  outfile: "api/index.cjs",
   external: [
     "better-sqlite3",
     "dotenv",
