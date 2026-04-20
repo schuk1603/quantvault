@@ -3,7 +3,8 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { eq } from "drizzle-orm";
 import * as schema from "@shared/schema";
 
-const sqlite = new Database("quantvault.db");
+const dbPath = process.env.NODE_ENV === "production" ? "/tmp/quantvault.db" : "quantvault.db";
+const sqlite = new Database(dbPath);
 const db = drizzle(sqlite);
 
 // ── Create tables ─────────────────────────────────────────────────
