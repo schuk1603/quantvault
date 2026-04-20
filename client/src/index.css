@@ -1,0 +1,112 @@
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=cabinet-grotesk@700,800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 13% 6%;
+    --foreground: 213 10% 92%;
+    --card: 220 13% 9%;
+    --card-foreground: 213 10% 92%;
+    --popover: 220 13% 9%;
+    --popover-foreground: 213 10% 92%;
+    --primary: 152 69% 45%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 220 13% 13%;
+    --secondary-foreground: 213 10% 75%;
+    --muted: 220 13% 13%;
+    --muted-foreground: 213 8% 50%;
+    --accent: 220 13% 15%;
+    --accent-foreground: 213 10% 92%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 16%;
+    --input: 220 13% 13%;
+    --ring: 152 69% 45%;
+    --radius: 0.5rem;
+    --font-display: 'Cabinet Grotesk', sans-serif;
+    --font-body: 'Satoshi', sans-serif;
+    /* Brand colors */
+    --green: 152 69% 45%;
+    --red: 0 72% 55%;
+    --amber: 38 92% 50%;
+    --blue: 210 100% 60%;
+  }
+
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  main {
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  main::-webkit-scrollbar { width: 4px; }
+  main::-webkit-scrollbar-track { background: transparent; }
+  main::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+
+  body {
+    font-family: var(--font-body);
+    font-size: 13px;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.01em;
+  }
+
+  * { box-sizing: border-box; }
+}
+
+@layer components {
+  /* Sidebar */
+  .sidebar-link {
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground
+           hover:text-foreground hover:bg-accent transition-all cursor-pointer;
+  }
+  .sidebar-link.active {
+    @apply text-foreground bg-accent;
+    border-left: 2px solid hsl(var(--primary));
+  }
+
+  /* KPI cards */
+  .kpi-card {
+    @apply rounded-lg border border-border bg-card p-4;
+  }
+  .kpi-value {
+    @apply text-xl font-bold;
+    font-family: var(--font-display);
+  }
+
+  /* Ticker monospace */
+  .ticker {
+    @apply font-mono font-bold tracking-tight;
+  }
+
+  /* Positive / negative coloring */
+  .text-pos { color: hsl(var(--green)); }
+  .text-neg { color: hsl(var(--red)); }
+  .text-neu { @apply text-muted-foreground; }
+
+  /* Signal badge */
+  .signal-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold;
+  }
+  .signal-strong-buy  { @apply bg-green-500/15 text-green-400 border border-green-500/25; }
+  .signal-buy         { @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+  .signal-neutral     { @apply bg-slate-500/10 text-slate-400 border border-slate-500/20; }
+  .signal-sell        { @apply bg-orange-500/10 text-orange-400 border border-orange-500/20; }
+  .signal-strong-sell { @apply bg-red-500/15 text-red-400 border border-red-500/25; }
+
+  /* Data table */
+  .data-table { @apply w-full text-xs; }
+  .data-table th { @apply py-2 px-3 text-left text-muted-foreground font-medium uppercase tracking-wider border-b border-border; }
+  .data-table td { @apply py-2.5 px-3 border-b border-border/50; }
+  .data-table tr:hover td { @apply bg-muted/20; }
+}
