@@ -1,83 +1,8 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { eq } from "drizzle-orm";
-import * as schema from "@shared/schema";
+import type * as schema from "@shared/schema";
 
-const dbPath = process.env.NODE_ENV === "production" ? "/tmp/quantvault.db" : "quantvault.db";
-const sqlite = new Database(dbPath);
-const db = drizzle(sqlite);
-
-// ── Create tables ─────────────────────────────────────────────────
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS watchlist_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticker TEXT NOT NULL,
-    company_name TEXT NOT NULL,
-    sector TEXT,
-    added_at TEXT NOT NULL,
-    notes TEXT,
-    target_price REAL,
-    alert_price REAL
-  );
-
-  CREATE TABLE IF NOT EXISTS theses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticker TEXT NOT NULL,
-    company_name TEXT NOT NULL,
-    direction TEXT NOT NULL,
-    conviction INTEGER NOT NULL,
-    thesis TEXT NOT NULL,
-    catalysts TEXT NOT NULL,
-    risks TEXT NOT NULL,
-    target_price REAL,
-    time_horizon TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active'
-  );
-
-  CREATE TABLE IF NOT EXISTS news_annotations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    news_id TEXT NOT NULL,
-    headline TEXT NOT NULL,
-    ticker TEXT,
-    signal TEXT NOT NULL,
-    importance INTEGER NOT NULL,
-    notes TEXT,
-    created_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS alerts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticker TEXT NOT NULL,
-    alert_type TEXT NOT NULL,
-    threshold REAL,
-    message TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS saved_backtests (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    tickers TEXT NOT NULL,
-    strategy TEXT NOT NULL,
-    params TEXT NOT NULL,
-    results_json TEXT,
-    sharpe REAL,
-    cagr REAL,
-    max_drawdown REAL,
-    created_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS ai_chats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    context TEXT,
-    created_at TEXT NOT NULL
-  );
-`);
+// ── Pure in-memory storage (works on Vercel serverless) ──────────────────────
+// Data persists for the lifetime of the serverless instance.
+// For a portfolio demo this is ideal — no native dependencies needed.
 
 export interface IStorage {
   // Watchlist
@@ -114,62 +39,89 @@ export interface IStorage {
   clearAiChats(): void;
 }
 
-class SqliteStorage implements IStorage {
-  // Watchlist
-  getWatchlist() { return db.select().from(schema.watchlistItems).all(); }
-  addToWatchlist(data: schema.InsertWatchlistItem) {
-    return db.insert(schema.watchlistItems).values({ ...data, addedAt: new Date().toISOString() }).returning().get();
+class MemoryStorage implements IStorage {
+  private watchlist: schema.WatchlistItem[] = [];
+  private theses: schema.Thesis[] = [];
+  private newsAnnotations: schema.NewsAnnotation[] = [];
+  private alerts: schema.Alert[] = [];
+  private savedBacktests: schema.SavedBacktest[] = [];
+  private aiChats: schema.AiChat[] = [];
+  private nextId = { watchlist: 1, theses: 1, news: 1, alerts: 1, backtests: 1, chats: 1 };
+
+  // ── Watchlist ──────────────────────────────────────────────────────
+  getWatchlist() { return [...this.watchlist]; }
+  addToWatchlist(data: schema.InsertWatchlistItem): schema.WatchlistItem {
+    const item: schema.WatchlistItem = { ...data, id: this.nextId.watchlist++, addedAt: data.addedAt || new Date().toISOString(), sector: data.sector ?? null, notes: data.notes ?? null, targetPrice: data.targetPrice ?? null, alertPrice: data.alertPrice ?? null };
+    this.watchlist.push(item);
+    return item;
   }
   updateWatchlistItem(id: number, data: Partial<schema.InsertWatchlistItem>) {
-    return db.update(schema.watchlistItems).set(data).where(eq(schema.watchlistItems.id, id)).returning().get();
+    const idx = this.watchlist.findIndex(w => w.id === id);
+    if (idx === -1) return undefined;
+    this.watchlist[idx] = { ...this.watchlist[idx], ...data };
+    return this.watchlist[idx];
   }
   removeFromWatchlist(id: number) {
-    db.delete(schema.watchlistItems).where(eq(schema.watchlistItems.id, id)).run();
+    this.watchlist = this.watchlist.filter(w => w.id !== id);
   }
 
-  // Theses
-  getTheses() { return db.select().from(schema.theses).all(); }
-  createThesis(data: schema.InsertThesis) {
+  // ── Theses ────────────────────────────────────────────────────────
+  getTheses() { return [...this.theses]; }
+  createThesis(data: schema.InsertThesis): schema.Thesis {
     const now = new Date().toISOString();
-    return db.insert(schema.theses).values({ ...data, createdAt: now, updatedAt: now }).returning().get();
+    const item: schema.Thesis = { ...data, id: this.nextId.theses++, createdAt: data.createdAt || now, updatedAt: data.updatedAt || now, targetPrice: data.targetPrice ?? null, timeHorizon: data.timeHorizon ?? null };
+    this.theses.push(item);
+    return item;
   }
   updateThesis(id: number, data: Partial<schema.InsertThesis>) {
-    return db.update(schema.theses).set({ ...data, updatedAt: new Date().toISOString() }).where(eq(schema.theses.id, id)).returning().get();
+    const idx = this.theses.findIndex(t => t.id === id);
+    if (idx === -1) return undefined;
+    this.theses[idx] = { ...this.theses[idx], ...data, updatedAt: new Date().toISOString() };
+    return this.theses[idx];
   }
-  deleteThesis(id: number) { db.delete(schema.theses).where(eq(schema.theses.id, id)).run(); }
+  deleteThesis(id: number) { this.theses = this.theses.filter(t => t.id !== id); }
 
-  // News annotations
-  getNewsAnnotations() { return db.select().from(schema.newsAnnotations).all(); }
-  createNewsAnnotation(data: schema.InsertNewsAnnotation) {
-    return db.insert(schema.newsAnnotations).values({ ...data, createdAt: new Date().toISOString() }).returning().get();
+  // ── News Annotations ──────────────────────────────────────────────
+  getNewsAnnotations() { return [...this.newsAnnotations]; }
+  createNewsAnnotation(data: schema.InsertNewsAnnotation): schema.NewsAnnotation {
+    const item: schema.NewsAnnotation = { ...data, id: this.nextId.news++, createdAt: data.createdAt || new Date().toISOString(), ticker: data.ticker ?? null, notes: data.notes ?? null };
+    this.newsAnnotations.push(item);
+    return item;
   }
-  deleteNewsAnnotation(id: number) { db.delete(schema.newsAnnotations).where(eq(schema.newsAnnotations.id, id)).run(); }
+  deleteNewsAnnotation(id: number) { this.newsAnnotations = this.newsAnnotations.filter(n => n.id !== id); }
 
-  // Alerts
-  getAlerts() { return db.select().from(schema.alerts).all(); }
-  createAlert(data: schema.InsertAlert) {
-    return db.insert(schema.alerts).values({ ...data, createdAt: new Date().toISOString() }).returning().get();
+  // ── Alerts ────────────────────────────────────────────────────────
+  getAlerts() { return [...this.alerts]; }
+  createAlert(data: schema.InsertAlert): schema.Alert {
+    const item: schema.Alert = { ...data, id: this.nextId.alerts++, createdAt: data.createdAt || new Date().toISOString(), threshold: data.threshold ?? null, isActive: data.isActive ?? 1 };
+    this.alerts.push(item);
+    return item;
   }
   toggleAlert(id: number) {
-    const existing = db.select().from(schema.alerts).where(eq(schema.alerts.id, id)).get();
-    if (!existing) return undefined;
-    return db.update(schema.alerts).set({ isActive: existing.isActive ? 0 : 1 }).where(eq(schema.alerts.id, id)).returning().get();
+    const idx = this.alerts.findIndex(a => a.id === id);
+    if (idx === -1) return undefined;
+    this.alerts[idx] = { ...this.alerts[idx], isActive: this.alerts[idx].isActive ? 0 : 1 };
+    return this.alerts[idx];
   }
-  deleteAlert(id: number) { db.delete(schema.alerts).where(eq(schema.alerts.id, id)).run(); }
+  deleteAlert(id: number) { this.alerts = this.alerts.filter(a => a.id !== id); }
 
-  // Backtests
-  getSavedBacktests() { return db.select().from(schema.savedBacktests).all(); }
-  saveBacktest(data: schema.InsertSavedBacktest) {
-    return db.insert(schema.savedBacktests).values({ ...data, createdAt: new Date().toISOString() }).returning().get();
+  // ── Backtests ─────────────────────────────────────────────────────
+  getSavedBacktests() { return [...this.savedBacktests]; }
+  saveBacktest(data: schema.InsertSavedBacktest): schema.SavedBacktest {
+    const item: schema.SavedBacktest = { ...data, id: this.nextId.backtests++, createdAt: data.createdAt || new Date().toISOString(), resultsJson: data.resultsJson ?? null, sharpe: data.sharpe ?? null, cagr: data.cagr ?? null, maxDrawdown: data.maxDrawdown ?? null };
+    this.savedBacktests.push(item);
+    return item;
   }
-  deleteBacktest(id: number) { db.delete(schema.savedBacktests).where(eq(schema.savedBacktests.id, id)).run(); }
+  deleteBacktest(id: number) { this.savedBacktests = this.savedBacktests.filter(b => b.id !== id); }
 
-  // AI Chat
-  getAiChats() { return db.select().from(schema.aiChats).all(); }
-  addAiChat(data: schema.InsertAiChat) {
-    return db.insert(schema.aiChats).values({ ...data, createdAt: new Date().toISOString() }).returning().get();
+  // ── AI Chat ───────────────────────────────────────────────────────
+  getAiChats() { return [...this.aiChats]; }
+  addAiChat(data: schema.InsertAiChat): schema.AiChat {
+    const item: schema.AiChat = { ...data, id: this.nextId.chats++, createdAt: data.createdAt || new Date().toISOString(), context: data.context ?? null };
+    this.aiChats.push(item);
+    return item;
   }
-  clearAiChats() { db.delete(schema.aiChats).run(); }
+  clearAiChats() { this.aiChats = []; }
 }
 
-export const storage = new SqliteStorage();
+export const storage = new MemoryStorage();

@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "../server/routes";
 import { createServer } from "http";
@@ -9,18 +8,19 @@ const httpServer = createServer(app);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-let initialized = false;
-const init = (async () => {
+// Initialize routes once
+const ready = (async () => {
   await registerRoutes(httpServer, app);
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    console.error("API error:", err);
     if (!res.headersSent) res.status(status).json({ message });
   });
-  initialized = true;
 })();
 
+// Vercel serverless handler
 export default async function handler(req: Request, res: Response) {
-  if (!initialized) await init;
+  await ready;
   return app(req, res);
 }
